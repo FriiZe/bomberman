@@ -34,6 +34,8 @@ model.load_map(DEFAULT_MAP) # TODO: the map, fruits and players should be receiv
 view = GraphicView(model, nickname)
 evm = EventManagerClient(model)
 network = NetworkClientController(model, evm, host, port, nickname)
+client_sock = network.client_sock()
+print(client_sock)
 kb = KeyboardController(evm)
 
 # main loop

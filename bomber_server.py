@@ -36,7 +36,12 @@ model = Model()
 model.load_map(map_file)
 for _ in range(10): model.add_fruit()
 evm = EventManagerServer(model)
-network = NetworkServerController(model, evm, port)
+liste_attente = []
+network = NetworkServerController(model, evm, port, liste_attente)
+server_sock = network.server_sock()
+
+def event_manager():
+    pass
 # view = GraphicView(model, "server")
 
 # main loop
