@@ -21,7 +21,6 @@ class NetworkServerController:
         self.server_socket.bind(('', port))
         self.server_socket.listen(1)
         self.map_loaded = map_loaded
-        self.player = None
         # ...
 
     # time event
@@ -40,14 +39,18 @@ class NetworkServerController:
                 client_socket.send(self.map_loaded.encode())
 
             if decoded_data == "fruits":
-                fruits_list = pickle.dumps(self.model.fruits)
-                client_socket.send(fruits_list)
+                client_socket.send(pickle.dumps(self.model.fruits))
 
-            #if decoded_data.startswith("nickname "):
-            #    self.player = decoded_data
+            if decoded_data.startswith("nickname "):
+                self.model.add_character(decoded_data.replace("nickname ", ""))
+                client_socket.send(pickle.dumps(self.model.characters))
 
-            #if decoded_data == "players":
-            #    model.add_character()
+            if decoded_data == "infos_characters":
+                client_socket.send(pickle.dumps(self.model.characters))
+            
+            if decoded_data.startswith("move "):
+                list_data = decoded_data.split(" ")
+                self.model.move_character(list_data[1], int(list_data[2]))
 
     def tick(self, dt):
         accepted_socket, address = self.server_socket.accept()
@@ -81,13 +84,9 @@ class NetworkClientController:
         for i in range(len(self.fruits)):
             model.add_fruit(self.fruits[i].kind, self.fruits[i].pos)
 
-        #nickname = "nickname " + self.nickname # request for creating a character
-        #self.client_socket.send(nickname.encode())
-        #self.player = self.client_socket.recv(1500).decode()
-
-        #self.client_socket.send("players".encode()) #request for players
-        #self.players = pickle.loads(self.client_socket.recv(1500))
-        #for i in range(len(self.players)):
+        nickname = "nickname " + self.nickname # request for creating a character
+        self.client_socket.send(nickname.encode())
+        self.model.characters = pickle.loads(self.client_socket.recv(1500))
         # ...
 
     # keyboard events
@@ -98,6 +97,10 @@ class NetworkClientController:
 
     def keyboard_move_character(self, direction):
         print("=> event \"keyboard move direction\" {}".format(DIRECTIONS_STR[direction]))
+        if direction in DIRECTIONS:
+            command = "move " + self.nickname + " " + str(direction)
+            self.client_socket.send(command.encode())
+            self.model.move_character(self.nickname, direction)
         # ...
         return True
 
@@ -109,5 +112,7 @@ class NetworkClientController:
     # time event
 
     def tick(self, dt):
+        self.client_socket.send("infos_characters".encode())
+        self.model.characters = pickle.loads(self.client_socket.recv(1500))
         # ...
         return True
