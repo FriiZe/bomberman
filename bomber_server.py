@@ -35,20 +35,14 @@ clock = pygame.time.Clock()
 model = Model()
 model.load_map(map_file)
 for _ in range(10): model.add_fruit()
-evm = EventManagerServer(model)
-liste_attente = []
-network = NetworkServerController(model, evm, port, liste_attente)
-server_sock = network.server_sock()
-
-def event_manager():
-    pass
+server = NetworkServerController(model, port)
 # view = GraphicView(model, "server")
 
 # main loop
 while True:
     # make sure game doesn't run at more than FPS frames per second
     dt = clock.tick(FPS)
-    network.tick(dt)
+    server.tick(dt)
     model.tick(dt)
     # view.tick(dt)
 

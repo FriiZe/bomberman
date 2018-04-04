@@ -2,6 +2,7 @@
 # Author: aurelien.esnard@u-bordeaux.fr
 
 import random
+import sys
 
 ################################################################################
 #                                  MODEL                                       #
@@ -202,7 +203,7 @@ class Model:
         character = self.look(nickname)
         if not character:
             print("Error: nickname {} not found!".format(nickname))
-            return None
+            sys.exit(1)
         self.characters.remove(character)
         if self.player == character: self.player = None
         print("=> kill \"{}\"".format(nickname))
@@ -230,7 +231,7 @@ class Model:
         character = self.look(nickname)
         if character:
             print("Error: nickname \"{}\" already used!".format(nickname))
-            return None
+            sys.exit(1)
         if pos is None: pos = self.map.random()
         if kind is None: kind = random.choice(CHARACTERS)
         character = Character(nickname, kind, self.map, pos)
@@ -244,7 +245,7 @@ class Model:
         character = self.look(nickname)
         if not character:
             print("Error: nickname \"{}\" not found!".format(nickname))
-            return
+            sys.exit(1)
         if character.disarmed == 0:
             self.bombs.append(Bomb(self.map, character.pos))
             character.disarmed = DISARMED
@@ -255,7 +256,7 @@ class Model:
         character = self.look(nickname)
         if not character:
             print("Error: nickname \"{}\" not found!".format(nickname))
-            return
+            sys.exit(1)
         character.move(direction)
         print("=> move {} \"{}\" at position ({},{})".format(DIRECTIONS_STR[direction], nickname, character.pos[X], character.pos[Y]))
 
