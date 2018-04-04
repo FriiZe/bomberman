@@ -30,9 +30,8 @@ pygame.display.init()
 pygame.font.init()
 clock = pygame.time.Clock()
 model = Model()
-model.load_map(DEFAULT_MAP)
-view = GraphicView(model, nickname)
 client = NetworkClientController(model, host, port, nickname)
+view = GraphicView(model, nickname)
 kb = KeyboardController(client)
 
 # main loop
