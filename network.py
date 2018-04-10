@@ -38,19 +38,33 @@ class NetworkServerController:
             if decoded_data == "map":
                 client_socket.send(self.map_loaded.encode())
 
-            if decoded_data == "fruits":
-                client_socket.send(pickle.dumps(self.model.fruits))
+            #if decoded_data == "fruits":
+            #    client_socket.send(pickle.dumps(self.model.fruits))
 
             if decoded_data.startswith("nickname "):
                 self.model.add_character(decoded_data.replace("nickname ", ""))
-                client_socket.send(pickle.dumps(self.model.characters))
+                #client_socket.send(pickle.dumps(self.model.characters))
 
-            if decoded_data == "infos_characters":
-                client_socket.send(pickle.dumps(self.model.characters))
+            #if decoded_data == "infos_characters":
+            #    client_socket.send(pickle.dumps(self.model.characters))
             
             if decoded_data.startswith("move "):
                 list_data = decoded_data.split(" ")
                 self.model.move_character(list_data[1], int(list_data[2]))
+            
+            if decoded_data.startswith("drop_bomb "):
+                self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
+            
+            if decoded_data.startswith("get_model "):
+                model_part = decoded_data.replace("get_model ", "")
+                if model_part == "characters":
+                    self.model.characters = client_socket.send(pickle.dumps(self.model.characters))
+                
+                if model_part == "fruits":
+                    self.model.fruits = client_socket.send(pickle.dumps(self.model.fruits))
+                
+                if model_part == "bombs":
+                    self.model.bombs = client_socket.send(pickle.dumps(self.model.bombs))
 
     def tick(self, dt):
         accepted_socket, address = self.server_socket.accept()
@@ -106,13 +120,29 @@ class NetworkClientController:
 
     def keyboard_drop_bomb(self):
         print("=> event \"keyboard drop bomb\"")
+        command = "drop_bomb " + self.nickname
+        self.client_socket.send(command.encode())
+        self.model = pickle.loads(self.client_socket.recv(1500))
         # ...
         return True
+    
+    def get_model(self):
+        self.client_socket.send("get_model characters".encode())
+        self.model.characters = pickle.loads(self.client_socket.recv(1500))
+
+        self.client_socket.send("get_model fruits".encode())
+        self.model.fruits = pickle.loads(self.client_socket.recv(1500))
+
+        self.client_socket.send("get_model bombs".encode())
+        self.model.bombs = pickle.loads(self.client_socket.recv(1500))
+        print("coucou")
+
 
     # time event
 
     def tick(self, dt):
-        self.client_socket.send("infos_characters".encode())
-        self.model.characters = pickle.loads(self.client_socket.recv(1500))
+        #self.client_socket.send("infos_characters".encode())
+        #self.model.characters = pickle.loads(self.client_socket.recv(1500))
+        get_model()
         # ...
         return True
