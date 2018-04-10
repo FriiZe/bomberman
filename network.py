@@ -24,51 +24,64 @@ class NetworkServerController:
         # ...
 
     # time event
-
-    def socket_treatment(self, client_socket):
+	# Fonction de traitement de chaque socket
+    def socket_treatment(self, client_socket, dt):
         while True:
             received_data = client_socket.recv(1500)
 
             if received_data == 0:
                 client_socket.close()
                 break
-
+			
             decoded_data = received_data.decode()
-
+			
+			#### Messages recus par le serveur et analyse ####
             if decoded_data == "map":
+				# on envoie la map
                 client_socket.send(self.map_loaded.encode())
 
-            #if decoded_data == "fruits":
-            #    client_socket.send(pickle.dumps(self.model.fruits))
+            if decoded_data == "fruits":
+				# on envoie la liste des fruits
+                client_socket.send(pickle.dumps(self.model.fruits))
 
             if decoded_data.startswith("nickname "):
+				# on envoie la liste des persos après avoir ajouté le nouveau
                 self.model.add_character(decoded_data.replace("nickname ", ""))
-                #client_socket.send(pickle.dumps(self.model.characters))
-
-            #if decoded_data == "infos_characters":
-            #    client_socket.send(pickle.dumps(self.model.characters))
+                client_socket.send(pickle.dumps(self.model.characters))
             
             if decoded_data.startswith("move "):
+				# sépare les éléments du message ["move", "nickname", "direction"]
                 list_data = decoded_data.split(" ")
+				# on move le perso
                 self.model.move_character(list_data[1], int(list_data[2]))
             
             if decoded_data.startswith("drop_bomb "):
+				# ajoute une bombe au model
                 self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
             
             if decoded_data.startswith("get_model "):
+				# on separe la commande principale de la commande secondaire
                 model_part = decoded_data.replace("get_model ", "")
                 if model_part == "characters":
-                    self.model.characters = client_socket.send(pickle.dumps(self.model.characters))
+					#on envoie la liste des persos
+                    client_socket.send(pickle.dumps(self.model.characters))
                 
                 if model_part == "fruits":
-                    self.model.fruits = client_socket.send(pickle.dumps(self.model.fruits))
+					# on envoie la liste des fruits
+                    client_socket.send(pickle.dumps(self.model.fruits))
                 
                 if model_part == "bombs":
-                    self.model.bombs = client_socket.send(pickle.dumps(self.model.bombs))
+					# on envoie la liste des bombes
+                    client_socket.send(pickle.dumps(self.model.bombs))
+			#### Fin analyse ####
+            
+			#Probleme
+            self.model.tick(dt)
 
     def tick(self, dt):
+		#on attend une socket et on crée un thread lorsqu'on en a une
         accepted_socket, address = self.server_socket.accept()
-        threading.Thread(None, self.socket_treatment, None, (accepted_socket,)).start()
+        threading.Thread(None, self.socket_treatment, None, (accepted_socket, dt)).start()
         # ...
         return True
 
@@ -94,9 +107,7 @@ class NetworkClientController:
         self.model.load_map(self.map_to_load)
 
         self.client_socket.send("fruits".encode()) #request for fruits
-        self.fruits = pickle.loads(self.client_socket.recv(1500))
-        for i in range(len(self.fruits)):
-            model.add_fruit(self.fruits[i].kind, self.fruits[i].pos)
+        self.model.fruits = pickle.loads(self.client_socket.recv(1500))
 
         nickname = "nickname " + self.nickname # request for creating a character
         self.client_socket.send(nickname.encode())
@@ -114,7 +125,6 @@ class NetworkClientController:
         if direction in DIRECTIONS:
             command = "move " + self.nickname + " " + str(direction)
             self.client_socket.send(command.encode())
-            self.model.move_character(self.nickname, direction)
         # ...
         return True
 
@@ -122,10 +132,10 @@ class NetworkClientController:
         print("=> event \"keyboard drop bomb\"")
         command = "drop_bomb " + self.nickname
         self.client_socket.send(command.encode())
-        self.model = pickle.loads(self.client_socket.recv(1500))
         # ...
         return True
     
+	# fonction pour demander en continu les infos au serveur
     def get_model(self):
         self.client_socket.send("get_model characters".encode())
         self.model.characters = pickle.loads(self.client_socket.recv(1500))
@@ -135,14 +145,10 @@ class NetworkClientController:
 
         self.client_socket.send("get_model bombs".encode())
         self.model.bombs = pickle.loads(self.client_socket.recv(1500))
-        print("coucou")
-
 
     # time event
 
     def tick(self, dt):
-        #self.client_socket.send("infos_characters".encode())
-        #self.model.characters = pickle.loads(self.client_socket.recv(1500))
-        get_model()
+        self.get_model()
         # ...
         return True
