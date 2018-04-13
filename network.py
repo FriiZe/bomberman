@@ -20,12 +20,19 @@ class NetworkServerController:
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind(('', port))
         self.server_socket.listen(1)
+        threading.Thread(None, self.connexion, None, ()).start()
         self.map_loaded = map_loaded
         # ...
 
     # time event
-	# Fonction de traitement de chaque socket
-    def socket_treatment(self, client_socket, dt):
+    def connexion(self):
+        #on attend une socket et on crée un thread lorsqu'on en a une
+        while True:
+            accepted_socket, address = self.server_socket.accept()
+            threading.Thread(None, self.socket_treatment, None, (accepted_socket,)).start()
+
+    # Fonction de traitement de chaque socket
+    def socket_treatment(self, client_socket):
         while True:
             received_data = client_socket.recv(1500)
 
@@ -76,12 +83,8 @@ class NetworkServerController:
 			#### Fin analyse ####
             
 			#Probleme
-            self.model.tick(dt)
 
     def tick(self, dt):
-		#on attend une socket et on crée un thread lorsqu'on en a une
-        accepted_socket, address = self.server_socket.accept()
-        threading.Thread(None, self.socket_treatment, None, (accepted_socket, dt)).start()
         # ...
         return True
 
