@@ -43,7 +43,7 @@ view = GraphicView(model, "server")
 while True:
     # make sure game doesn't run at more than FPS frames per second
     dt = clock.tick(FPS)
-    server.tick(dt)
+    #server.tick(dt)
     model.tick(dt)
     view.tick(dt)
 
