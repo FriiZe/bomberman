@@ -43,7 +43,10 @@ class NetworkServerController:
 
             decoded_data = received_data[0].decode()
 			
+			##################################################
 			#### Messages recus par le serveur et analyse ####
+			##################################################
+
             if decoded_data == "map":
 				# on envoie la map
                 client_socket.sendall(self.map_loaded.encode())
@@ -84,7 +87,10 @@ class NetworkServerController:
                 if model_part == "bombs":
 					# on envoie la liste des bombes
                     client_socket.sendall(pickle.dumps(self.model.bombs))
+
+			#####################
 			#### Fin analyse ####
+			#####################
 
     #def tick(self, dt):
         # ...
@@ -107,20 +113,25 @@ class NetworkClientController:
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.client_socket.connect((host, port))
 
-        self.client_socket.sendall("map|".encode()) # request for map to download
+        # request for map to download
+        self.client_socket.sendall("map|".encode())
         self.map_to_load = self.client_socket.recv(1500).decode()
         self.model.load_map(self.map_to_load)
 
-        self.client_socket.sendall("fruits|".encode()) #request for fruits
+        #request for fruits
+        self.client_socket.sendall("fruits|".encode())
         self.model.fruits = pickle.loads(self.client_socket.recv(1500))
 
-        nickname = "nickname " + self.nickname + "|" # request for creating a character
+        # request for creating a character
+        nickname = "nickname " + self.nickname + "|"
         self.client_socket.sendall(nickname.encode())
         self.model.characters = pickle.loads(self.client_socket.recv(1500))
         # ...
 
-    # keyboard events
-
+	#########################
+	#### keyboard events ####
+	#########################
+    
     def keyboard_quit(self):
         print("=> event \"quit\"")
         return False
@@ -139,6 +150,10 @@ class NetworkClientController:
         self.client_socket.sendall(command.encode())
         # ...
         return True
+
+    #############################
+    #### End keyboard events ####
+    #############################
     
 	# fonction pour demander en continu les infos au serveur
     def get_model(self):
