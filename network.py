@@ -25,7 +25,8 @@ class NetworkServerController:
         self.map_loaded = map_loaded
         self.lock = threading.Lock()
         self.change = False
-        self.clients = []
+        self.clients = {}
+        self.disconnected_clients = {}
         # ...
 
     # time event
@@ -33,7 +34,6 @@ class NetworkServerController:
         #on attend une socket et on crée un thread lorsqu'on en a une
         while True:
             accepted_socket, address = self.server_socket.accept()
-            self.clients.append(accepted_socket)
             threading.Thread(None, self.socket_treatment, None, (accepted_socket,)).start()
 
     # Fonction de traitement de chaque socket
@@ -57,7 +57,9 @@ class NetworkServerController:
 
                 if decoded_data.startswith("nickname "):
                     # on envoie la liste des persos après avoir ajouté le nouveau
-                    self.model.add_character(decoded_data.replace("nickname ", ""))
+                    nickname = decoded_data.replace("nickname ", "")
+                    self.model.add_character(nickname)
+                    self.clients[nickname] = [client_socket]
                     client_socket.sendall(pickle.dumps(self.model.characters))
                 
             with self.lock:
@@ -70,14 +72,22 @@ class NetworkServerController:
                 if decoded_data.startswith("drop_bomb "):
                     # ajoute une bombe au model
                     self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
+
+                if decoded_data.startswith("disconnect"):
+                    self.model.characters.remove(self.model.look(nickname))
+                    self.disconnected_clients[nickname] = self.clients[nickname]
+                    self.clients.pop(nickname, None)
+                    client_socket.close()
+                    break
+
                 self.change = True
 			#####################
 			#### Fin analyse ####
 			#####################
     def send_model(self):
-        for client in self.clients:
+        for client in self.clients.values():
             datas = [self.model.characters, self.model.fruits, self.model.bombs]
-            client.sendall(pickle.dumps(datas))
+            client[0].sendall(pickle.dumps(datas))
 
     def tick(self, dt):
         # ...
@@ -121,6 +131,7 @@ class NetworkClientController:
 	#########################
     
     def keyboard_quit(self):
+        self.client_socket.sendall("disconnect".encode())
         print("=> event \"quit\"")
         return False
 
@@ -147,7 +158,7 @@ class NetworkClientController:
 
     def tick(self, dt):
         try:
-            decoded_data = pickle.loads(self.client_socket.recv(1500))
+            decoded_data = pickle.loads(self.client_socket.recv(15000))
             self.model.characters = decoded_data[0]
             self.model.fruits = decoded_data[1]
             self.model.bombs = decoded_data[2]
