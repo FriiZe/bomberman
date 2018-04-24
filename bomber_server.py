@@ -34,9 +34,10 @@ pygame.font.init()
 clock = pygame.time.Clock()
 model = Model()
 model.load_map(map_file)
+print(model.map.array)
 
 for _ in range(10): model.add_fruit()
-server = NetworkServerController(model, port, map_file)
+server = NetworkServerController(model, port)
 view = GraphicView(model, "server")
 
 # main loop

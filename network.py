@@ -14,7 +14,7 @@ import errno
 
 class NetworkServerController:
 
-    def __init__(self, model, port, map_loaded):
+    def __init__(self, model, port):
         self.model = model
         self.port = port
         self.server_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0)
@@ -22,11 +22,16 @@ class NetworkServerController:
         self.server_socket.bind(('', port))
         self.server_socket.listen(1)
         threading.Thread(None, self.connexion, None, ()).start()
-        self.map_loaded = map_loaded
         self.lock = threading.Lock()
         self.change = False
         self.clients = {}
         self.disconnected_clients = {}
+        self.countdown_bomb = 20
+        self.time_to_drop_bomb = (21)*1000-1 # in ms
+        self.nb_bombs_to_drop = 1
+        self.countdown_fruit = 25
+        self.time_to_drop_fruit = (26)*1000-1 # in ms
+        self.nb_fruits_to_drop = 1
         # ...
 
     # time event
@@ -53,7 +58,8 @@ class NetworkServerController:
             with self.lock:
                 if decoded_data == "map":
                     # on envoie la map
-                    client_socket.sendall(self.map_loaded.encode())
+                    the_map = [self.model.map.width, self.model.map.height, self.model.map.array]
+                    client_socket.sendall(pickle.dumps(the_map))
 
                 if decoded_data.startswith("nickname "):
                     # on envoie la liste des persos après avoir ajouté le nouveau
@@ -97,16 +103,44 @@ class NetworkServerController:
 			#####################
 			#### Fin analyse ####
 			#####################
+
     def send_model(self):
         for client in self.clients.values():
-            datas = [self.model.characters, self.model.fruits, self.model.bombs]
+            datas = [self.model.characters, self.model.bombs, self.model.fruits]
             client[0].sendall(pickle.dumps(datas))
+
+    def drop_a_bomb(self, dt):
+        if self.time_to_drop_bomb >= 0:
+            self.time_to_drop_bomb -= dt
+            self.countdown_bomb = int(self.time_to_drop_bomb / 1000)
+        else:
+            for i in range(self.nb_bombs_to_drop):
+                self.model.bombs.append(Bomb(self.model.map, self.model.map.random()))
+            self.send_model()
+            self.countdown_bomb = 20
+            self.time_to_drop_bomb = (21)*1000-1 # in ms
+            self.nb_bombs_to_drop += 1
+
+    def drop_a_fruit(self, dt):
+        if self.time_to_drop_fruit >= 0:
+            self.time_to_drop_fruit -= dt
+            self.countdown_fruit = int(self.time_to_drop_fruit / 1000)
+        else:
+            for i in range(self.nb_fruits_to_drop):
+                self.model.fruits.append(Fruit(random.choice(FRUITS), self.model.map, self.model.map.random()))
+            self.send_model()
+            self.countdown_fruit = 25
+            self.time_to_drop_fruit = (26)*1000-1 # in ms
+            self.nb_fruits_to_drop = random.randint(0,4)
 
     def tick(self, dt):
         # ...
         if self.change == True:
             self.send_model()
             self.change = False
+
+        self.drop_a_bomb(dt)
+        self.drop_a_fruit(dt)
         return True
 
 ################################################################################
@@ -128,8 +162,10 @@ class NetworkClientController:
 
         # request for map to download
         self.client_socket.sendall("map|".encode())
-        self.map_to_load = self.client_socket.recv(1500).decode()
-        self.model.load_map(self.map_to_load)
+        self.map = pickle.loads(self.client_socket.recv(15000))
+        self.model.map.width = self.map[0]
+        self.model.map.height = self.map[1]
+        self.model.map.array = self.map[2]
 
         # request for creating a character
         nickname = "nickname " + self.nickname + "|"
@@ -173,8 +209,8 @@ class NetworkClientController:
         try:
             decoded_data = pickle.loads(self.client_socket.recv(15000))
             self.model.characters = decoded_data[0]
-            self.model.fruits = decoded_data[1]
-            self.model.bombs = decoded_data[2]
+            self.model.bombs = decoded_data[1]
+            self.model.fruits = decoded_data[2]
         except socket.error as e:
             if e.args[0] == errno.EWOULDBLOCK:
                 pass
