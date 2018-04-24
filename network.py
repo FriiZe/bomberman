@@ -33,11 +33,11 @@ class NetworkServerController:
     def connexion(self):
         #on attend une socket et on crée un thread lorsqu'on en a une
         while True:
-            accepted_socket, address = self.server_socket.accept()
-            threading.Thread(None, self.socket_treatment, None, (accepted_socket,)).start()
+            accepted_socket, (address, port) = self.server_socket.accept()
+            threading.Thread(None, self.socket_treatment, None, (accepted_socket, address)).start()
 
     # Fonction de traitement de chaque socket
-    def socket_treatment(self, client_socket):
+    def socket_treatment(self, client_socket, address):
         while True:
             received_data = client_socket.recv(1500).split("|".encode())
 
@@ -58,8 +58,20 @@ class NetworkServerController:
                 if decoded_data.startswith("nickname "):
                     # on envoie la liste des persos après avoir ajouté le nouveau
                     nickname = decoded_data.replace("nickname ", "")
-                    self.model.add_character(nickname)
-                    self.clients[nickname] = [client_socket]
+                    
+                    if len(self.disconnected_clients) > 0:
+                        for disconnected in self.disconnected_clients:
+                            if disconnected == nickname and self.disconnected_clients[nickname][2] == address:
+                                self.model.characters.append(self.disconnected_clients[nickname][1])
+                                self.disconnected_clients.pop(nickname, None)
+                                break
+                            else:
+                                self.model.add_character(nickname)
+                                break
+                    else:
+                        self.model.add_character(nickname)
+                    
+                    self.clients[nickname] = [client_socket, None, address]
                     client_socket.sendall(pickle.dumps(self.model.characters))
                 
             with self.lock:
@@ -74,7 +86,8 @@ class NetworkServerController:
                     self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
 
                 if decoded_data.startswith("disconnect"):
-                    self.model.characters.remove(self.model.look(nickname))
+                    self.clients[nickname][1] = self.model.look(nickname)
+                    self.model.kill_character(nickname)
                     self.disconnected_clients[nickname] = self.clients[nickname]
                     self.clients.pop(nickname, None)
                     client_socket.close()
