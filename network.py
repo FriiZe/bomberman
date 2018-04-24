@@ -6,6 +6,7 @@ import socket
 import threading
 import select
 import pickle
+import errno
 
 ################################################################################
 #                          NETWORK SERVER CONTROLLER                           #
@@ -23,6 +24,8 @@ class NetworkServerController:
         threading.Thread(None, self.connexion, None, ()).start()
         self.map_loaded = map_loaded
         self.lock = threading.Lock()
+        self.change = False
+        self.clients = []
         # ...
 
     # time event
@@ -30,6 +33,7 @@ class NetworkServerController:
         #on attend une socket et on crée un thread lorsqu'on en a une
         while True:
             accepted_socket, address = self.server_socket.accept()
+            self.clients.append(accepted_socket)
             threading.Thread(None, self.socket_treatment, None, (accepted_socket,)).start()
 
     # Fonction de traitement de chaque socket
@@ -42,59 +46,45 @@ class NetworkServerController:
                 break
 
             decoded_data = received_data[0].decode()
-			
+
 			##################################################
 			#### Messages recus par le serveur et analyse ####
 			##################################################
+            with self.lock:
+                if decoded_data == "map":
+                    # on envoie la map
+                    client_socket.sendall(self.map_loaded.encode())
 
-            if decoded_data == "map":
-				# on envoie la map
-                client_socket.sendall(self.map_loaded.encode())
-
-            if decoded_data == "fruits":
-				# on envoie la liste des fruits
-                client_socket.sendall(pickle.dumps(self.model.fruits))
-
-            if decoded_data.startswith("nickname "):
-				# on envoie la liste des persos après avoir ajouté le nouveau
-                with self.lock:
+                if decoded_data.startswith("nickname "):
+                    # on envoie la liste des persos après avoir ajouté le nouveau
                     self.model.add_character(decoded_data.replace("nickname ", ""))
-                client_socket.sendall(pickle.dumps(self.model.characters))
-            
-            if decoded_data.startswith("move "):
-				# sépare les éléments du message ["move", "nickname", "direction"]
-                list_data = decoded_data.split(" ")
-				# on move le perso
-                with self.lock:
-                    self.model.move_character(list_data[1], int(list_data[2]))
-            
-            if decoded_data.startswith("drop_bomb "):
-				# ajoute une bombe au model
-                with self.lock:
-                    self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
-            
-            if decoded_data.startswith("get_model "):
-				# on separe la commande principale de la commande secondaire
-                model_part = decoded_data.replace("get_model ", "")
-                if model_part == "characters":
-					#on envoie la liste des persos
                     client_socket.sendall(pickle.dumps(self.model.characters))
                 
-                if model_part == "fruits":
-					# on envoie la liste des fruits
-                    client_socket.sendall(pickle.dumps(self.model.fruits))
+            with self.lock:
+                if decoded_data.startswith("move "):
+                    # sépare les éléments du message ["move", "nickname", "direction"]
+                    list_data = decoded_data.split(" ")
+                    # on move le perso
+                    self.model.move_character(list_data[1], int(list_data[2]))
                 
-                if model_part == "bombs":
-					# on envoie la liste des bombes
-                    client_socket.sendall(pickle.dumps(self.model.bombs))
-
+                if decoded_data.startswith("drop_bomb "):
+                    # ajoute une bombe au model
+                    self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
+                self.change = True
 			#####################
 			#### Fin analyse ####
 			#####################
+    def send_model(self):
+        for client in self.clients:
+            datas = [self.model.characters, self.model.fruits, self.model.bombs]
+            client.sendall(pickle.dumps(datas))
 
-    #def tick(self, dt):
+    def tick(self, dt):
         # ...
-        #return True
+        if self.change == True:
+            self.send_model()
+            self.change = False
+        return True
 
 ################################################################################
 #                          NETWORK CLIENT CONTROLLER                           #
@@ -118,15 +108,13 @@ class NetworkClientController:
         self.map_to_load = self.client_socket.recv(1500).decode()
         self.model.load_map(self.map_to_load)
 
-        #request for fruits
-        self.client_socket.sendall("fruits|".encode())
-        self.model.fruits = pickle.loads(self.client_socket.recv(1500))
-
         # request for creating a character
         nickname = "nickname " + self.nickname + "|"
         self.client_socket.sendall(nickname.encode())
         self.model.characters = pickle.loads(self.client_socket.recv(1500))
         # ...
+
+        self.client_socket.setblocking(False)
 
 	#########################
 	#### keyboard events ####
@@ -154,21 +142,18 @@ class NetworkClientController:
     #############################
     #### End keyboard events ####
     #############################
-    
-	# fonction pour demander en continu les infos au serveur
-    def get_model(self):
-        self.client_socket.sendall("get_model characters|".encode())
-        self.model.characters = pickle.loads(self.client_socket.recv(1500))
-
-        self.client_socket.sendall("get_model fruits|".encode())
-        self.model.fruits = pickle.loads(self.client_socket.recv(1500))
-
-        self.client_socket.sendall("get_model bombs|".encode())
-        self.model.bombs = pickle.loads(self.client_socket.recv(1500))
 
     # time event
 
     def tick(self, dt):
-        self.get_model()
-        # ...
+        try:
+            decoded_data = pickle.loads(self.client_socket.recv(1500))
+            self.model.characters = decoded_data[0]
+            self.model.fruits = decoded_data[1]
+            self.model.bombs = decoded_data[2]
+        except socket.error as e:
+            if e.args[0] == errno.EWOULDBLOCK:
+                pass
+            else:
+                print("Socket error: ", e)
         return True
