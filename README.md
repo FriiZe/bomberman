@@ -1,59 +1,40 @@
 # Bomber Man #
 
-This is a simple "Bomber Man" game written in Python 3, based on the *PyGame* library.
+Vérifiez s'il vous plaît que vous avez bien installé Python3 (https://www.python.org/downloads/) et la bibliothèque PyGame (https://www.pygame.org/download.shtml)
 
-![Bomber Man Snapshot](snap0.png?raw=true "snapshot")
+## Créer un serveur ##
 
+- Ouvrez un terminal
+- Placez-vous dans le répertoire du jeu (là où se trouvent les fichiers bomber_server.py, bomber_client.py et bomber.py)
+- Tapez la commande suivante : ./bomber_server.py <PORT> [maps/<MAP_NAME>]
+  Cette commande crée un serveur auquel les joueurs peuvent se connecter grâce à votre adresse IP et votre port numéro <PORT>. Vous pouvez spécifier une map particulière grâce à l'option maps/<MAP_NAME>, ce qui chargera la map au nom <MAP_NAME> contenue dans le dossier "maps" de votre répertoire principal.
 
-## Download & Install ##
+Vous avez créé un serveur !
 
-First clone the project available on GitHUB under GPL:
+## Se connecter au serveur ##
 
-```
-  $ git clone https://github.com/orel33/bomber
-```
+- Ouvrez un terminal
+- Placez-vous dans le répertoire du jeu (là où se trouvent les fichiers bomber_server.py, bomber_client.py et bomber.py)
+- Tapez la commande suivante : ./bomber_client.py <IP_ADDRESS> <PORT> <NICKNAME>
+  Cette commande lance une fenêtre de jeu, charge la map du serveur (pas besoin d'avoir la map dans vos fichiers), en vous connectant au serveur situé sur l'ip <IP_ADDRESS> au port <PORT>, sous le pseudonyme <NICKNAME>. ATTENTION : si quelqu'un joue déjà avec le même pseudo que vous, vous ne pourrez pas vous connecter !
 
-To install Python (root privilege required):
+Vous êtes maintenant prêt à jouer !
 
-```
-  $ sudo apt get install python3 pip3
-```
+## JOUER ##
 
-To install the *PyGame* library (user privilege enough):
+- Déplacements : flèches directionnelles
+- Lâcher une bombe : touche "espace"
+- Quitter le jeu : touche "échap"
 
-```
-  $ pip3 install pygame
-```
+Toutes les X secondes, une flopée de bombes est lâchée aléatoirement sur la map. Le nombre de bombes augmente au fur et à mesure de la partie, puis revient à UNE bombe lâchée pour recommencer un cycle.
+Toutes les X secondes, une flopée de fruits est lâchée si le nombre de fruits présents sur la map ne dépasse pas un certain seuil. L'apparition des fruits se fait à des positions aléatoires, et leur nombre est aussi aléatoire, variant entre 0 fruits et X fruits.
 
-To start the game:
+(L'imprécision à l'aide des "X" est volontaire, afin de vous laisser découvrir par vous-même...)
 
-```
-  $ ./bomber.py
-```
+Vous vous connectez avec 50 points de vie.
+Si vous êtes touché par une ou plusieurs bombes, vous perdez 10 points de vie.
+Si vous ramassez un fruit, vous gagnez 10 points de vie.
 
-By default, the map "maps/map0" is used, but you can generate you own map (*mymap*) and use it as follows:
+Si vous quittez la partie, que ce soit par une mort violente (coupure de réseau, d'électricité...) ou une déconnexion de votre part, et que vous vous reconnectez avec la même adresse IP et le même nickname, vous serez automatiquement remis au même endroit, avec la même apparence et le même nom de points de vie.
 
-```
-  $ ./bomber.py maps/mymap
-```
-
-## Rules ##
-
-This game is similar to a classic "Bomber Man". This is a *standalone* version of the game for a single player. In this version, a single character (or player) starts the game with an initial amount of 50 health points. Each fruit brings a character with 10 extra health points, while each bomb blast removes 10 health points. A character is dead when its health points reach zero. A character gets immunity for a while after he's hit by a bomb blast. After a character drops a bomb, he is disarmed for a while.
-
-To play, just use the following keys:
-  * use *arrows* to move the current character
-  * press *space* to drop a bomb at current position, that will explode after a delay of 5 seconds
-  * press *escape* to quit the game
-
-The implementation of this game follows a simple MVC architecture (Model/View/Controller).
-
-## Known Bugs ##
-
-There is a [known bug](https://github.com/pygame/pygame/issues/331) in the *pygame.mixer* module, which causes high CPU usage, when calling *pygame.init()*. A workaround is to disable the mixer module, *pygame.mixer.quit()* or not to enable it, by using *pygame.display.init()* and *pygame.font.init()* instead. Consequently, there is no music, no sound :-(
-
-## Documentation ##
-
-  * https://www.pygame.org
-  * https://openclassrooms.com/courses/interface-graphique-PyGame-pour-python/tp-dk-labyrinthe
-  * http://ezide.com/games/writing-games.html
+Si vous mourrez, vous devrez vous reconnecter pour rejoueren revenant au point de départ (50 points de vie, placement et apaprence aléatoires).
