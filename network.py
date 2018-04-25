@@ -44,70 +44,106 @@ class NetworkServerController:
     # Fonction de traitement de chaque socket
     def socket_treatment(self, client_socket, address):
         while True:
-            received_data = client_socket.recv(1500).split("|".encode())
+            try:
+                received_data = client_socket.recv(1500).split("|".encode())
 
-            if received_data[0] == 0:
-                client_socket.close()
-                break
-
-            decoded_data = received_data[0].decode()
-
-			##################################################
-			#### Messages recus par le serveur et analyse ####
-			##################################################
-            with self.lock:
-                if decoded_data == "map":
-                    # on envoie la map
-                    the_map = [self.model.map.width, self.model.map.height, self.model.map.array]
-                    client_socket.sendall(pickle.dumps(the_map))
-
-                if decoded_data.startswith("nickname "):
-                    # on envoie la liste des persos après avoir ajouté le nouveau
-                    nickname = decoded_data.replace("nickname ", "")
-                    
-                    if len(self.disconnected_clients) > 0:
-                        for disconnected in self.disconnected_clients:
-                            if disconnected == nickname and self.disconnected_clients[nickname][2] == address:
-                                self.model.characters.append(self.disconnected_clients[nickname][1])
-                                self.disconnected_clients.pop(nickname, None)
-                                break
-                            else:
-                                self.model.add_character(nickname)
-                                break
-                    else:
-                        self.model.add_character(nickname)
-                    
-                    self.clients[nickname] = [client_socket, None, address]
-                    client_socket.sendall(pickle.dumps(self.model.characters))
-                
-            with self.lock:
-                if decoded_data.startswith("move "):
-                    # sépare les éléments du message ["move", "nickname", "direction"]
-                    list_data = decoded_data.split(" ")
-                    # on move le perso
-                    self.model.move_character(list_data[1], int(list_data[2]))
-                
-                if decoded_data.startswith("drop_bomb "):
-                    # ajoute une bombe au model
-                    self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
-
-                if decoded_data.startswith("disconnect"):
-                    self.clients[nickname][1] = self.model.look(nickname)
-                    self.model.kill_character(nickname)
-                    self.disconnected_clients[nickname] = self.clients[nickname]
-                    self.clients.pop(nickname, None)
+                if received_data[0] == 0:
                     client_socket.close()
                     break
 
-                self.change = True
-			#####################
-			#### Fin analyse ####
-			#####################
+                decoded_data = received_data[0].decode()
+
+                ##################################################
+                #### Messages recus par le serveur et analyse ####
+                ##################################################
+                with self.lock:
+                    if decoded_data == "map":
+                        # on envoie la map
+                        the_map = [self.model.map.width, self.model.map.height, self.model.map.array]
+                        client_socket.sendall(pickle.dumps(the_map))
+
+                    if decoded_data.startswith("nickname "):
+                        # on envoie la liste des persos après avoir ajouté le nouveau
+                        nickname = decoded_data.replace("nickname ", "")
+                        
+                        if len(self.disconnected_clients) > 0:
+                            for disconnected in self.disconnected_clients:
+                                if disconnected == nickname and self.disconnected_clients[nickname][2] == address:
+                                    self.model.characters.append(self.disconnected_clients[nickname][1])
+                                    self.disconnected_clients.pop(nickname, None)
+                                    break
+                                else:
+                                    self.model.add_character(nickname)
+                                    break
+                        else:
+                            self.model.add_character(nickname)
+                        
+                        self.clients[nickname] = [client_socket, None, address]
+                        client_socket.sendall(pickle.dumps(self.model.characters))
+                    
+                with self.lock:
+                    if decoded_data.startswith("move "):
+                        # sépare les éléments du message ["move", "nickname", "direction"]
+                        list_data = decoded_data.split(" ")
+                        # on move le perso
+                        self.model.move_character(list_data[1], int(list_data[2]))
+                    
+                    if decoded_data.startswith("drop_bomb "):
+                        # ajoute une bombe au model
+                        self.model.drop_bomb(decoded_data.replace("drop_bomb ", ""))
+
+                    if decoded_data.startswith("disconnect"):
+                        self.clients[nickname][1] = self.model.look(nickname)
+                        self.model.kill_character(nickname)
+                        self.disconnected_clients[nickname] = self.clients[nickname]
+                        self.clients.pop(nickname, None)
+                        client_socket.close()
+                        break
+
+                    self.change = True
+            #####################
+            #### Fin analyse ####
+            #####################
+                    
+            except BrokenPipeError:
+                print(self.clients)
+                print(self.disconnected_clients)
+                print("--------------------------")
+                self.clients[nickname][1] = self.model.look(nickname)
+                self.model.kill_character(nickname)
+                self.disconnected_clients[nickname] = self.clients[nickname]
+                self.clients.pop(nickname, None)
+                client_socket.close()
+                print("--------------------------")
+                print(self.clients)
+                print(self.disconnected_clients)
+                break
+            else:
+                pass
 
     def send_model(self):
-        for client in self.clients.values():
-            datas = [self.model.characters, self.model.bombs, self.model.fruits]
-            client[0].sendall(pickle.dumps(datas))
+        for client in self.clients:
+            socket_client = self.clients[client][0]
+            
+            try:
+                datas = [self.model.characters, self.model.bombs, self.model.fruits]
+                socket_client.sendall(pickle.dumps(datas))
+                
+            except BrokenPipeError:
+                print(self.clients)
+                print(self.disconnected_clients)
+                print("--------------------------")
+                self.clients[client][1] = self.model.look(client)
+                self.model.kill_character(client)
+                self.disconnected_clients[client] = self.clients[client]
+                self.clients.pop(client, None)
+                socket_client.close()
+                print("--------------------------")
+                print(self.clients)
+                print(self.disconnected_clients)
+                break
+            else:
+                pass
 
     def drop_a_bomb(self, dt):
         if self.time_to_drop_bomb >= 0:
@@ -119,6 +155,8 @@ class NetworkServerController:
             self.send_model()
             self.countdown_bomb = 20
             self.time_to_drop_bomb = (21)*1000-1 # in ms
+            if self.nb_bombs_to_drop == 15:
+                self.nb_bombs_to_drop = 0
             self.nb_bombs_to_drop += 1
 
     def drop_a_fruit(self, dt):
@@ -126,12 +164,12 @@ class NetworkServerController:
             self.time_to_drop_fruit -= dt
             self.countdown_fruit = int(self.time_to_drop_fruit / 1000)
         else:
-            for i in range(self.nb_fruits_to_drop):
-                self.model.fruits.append(Fruit(random.choice(FRUITS), self.model.map, self.model.map.random()))
-            self.send_model()
+            if len(self.model.fruits) < 8:
+                for i in range(random.randint(0,3)):
+                    self.model.fruits.append(Fruit(random.choice(FRUITS), self.model.map, self.model.map.random()))
+                self.send_model()
             self.countdown_fruit = 25
             self.time_to_drop_fruit = (26)*1000-1 # in ms
-            self.nb_fruits_to_drop = random.randint(0,4)
 
     def tick(self, dt):
         # ...
